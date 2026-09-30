@@ -1,0 +1,15 @@
+\documentclass[tikz,border=2pt]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+\begin{document}
+\begin{tikzpicture}
+  \begin{axis}[
+    hide axis,          % Removes axis lines, ticks, and labels
+    xmin=-5, xmax=5,    % Set your X domain bounds
+    ymin=-2, ymax=25    % Set your Y range bounds
+  ]
+    \addplot[blue, thick, domain=-4:5, samples=100] {x^2};
+  \end{axis}
+\end{tikzpicture}
+\end{document}

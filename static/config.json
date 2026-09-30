@@ -1,0 +1,8 @@
+{
+  "tex_compiler_url": "localhost:8080/api/tex",
+  "tex_support_assets": false,
+  "tex_data_mode": "multipart",
+  "auto_compile": true,
+  "debounce_ms": 1500,
+  "timeout_ms": 60000
+}
