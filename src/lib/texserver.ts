@@ -1,4 +1,4 @@
-// Client for the edotex TeX server (`edotexserver serve`, endpoint POST /api/tex).
+// Client for the edotex TeX server (`edotex serve`, endpoint POST /api/tex).
 //
 // This file is the reference implementation: it has no Svelte or app imports and
 // runs unchanged in the browser and in Node 22+ (see tests/server.test.mjs).
@@ -6,8 +6,10 @@
 // Protocol (edotex 0.1.0):
 //
 //   Request   POST <tex_compiler_url>
-//             body: the complete TeX document as UTF-8, at most 8 MiB.
-//             Assets (images, own classes) cannot be sent yet: tex_support_assets = false.
+//             body: the complete TeX document as UTF-8, or with assets (images, own
+//             classes) multipart/form-data: first part the TeX document, then one
+//             part per asset, stored under its filename next to the document.
+//             The server limits the body size (edotex serve: 20 MiB).
 //
 //   Response  HTTP 200, Content-Type: multipart/mixed; boundary=…   (tex_data_mode "multipart")
 //             1. application/json      {"type":"progress","status":"processing"}
@@ -84,6 +86,8 @@ export interface CompileOptions {
   timeoutMs?: number;
   /** Called with each compiler log line as soon as it arrives, before the result. */
   onLog?: (line: string) => void;
+  /** Files the document references, e.g. images; sent as multipart/form-data. */
+  assets?: { name: string; data: Blob }[];
 }
 
 /**
@@ -94,7 +98,20 @@ export interface CompileOptions {
  * as `ok: false` with a description in `errors` and `log`.
  */
 export async function compile(source: string, options: CompileOptions): Promise<CompileResult> {
-  const body = new TextEncoder().encode(source);
+  const tex = new TextEncoder().encode(source);
+  const assets = options.assets ?? [];
+  let body: BodyInit = tex;
+  let requestBytes = tex.length;
+  if (assets.length) {
+    // The server takes the first part as the document, whatever its name
+    const form = new FormData();
+    form.append('tex', new Blob([tex], { type: 'text/plain' }), 'main.tex');
+    for (const a of assets) {
+      form.append('file', a.data, a.name);
+      requestBytes += a.data.size;
+    }
+    body = form;
+  }
   const started = performance.now();
   const done = (r: Partial<CompileResult>): CompileResult => ({
     ok: false,
@@ -104,7 +121,7 @@ export async function compile(source: string, options: CompileOptions): Promise<
     aborted: false,
     ...r,
     ms: Math.round(performance.now() - started),
-    requestBytes: body.length
+    requestBytes
   });
   const fail = (message: string, r: Partial<CompileResult> = {}) => done({ errors: [{ message }], log: message, ...r });
 
@@ -129,9 +146,9 @@ export async function compile(source: string, options: CompileOptions): Promise<
   try {
     res = await fetch(url, {
       method: 'POST',
-      // The server ignores the type. text/plain keeps this a "simple" CORS request
-      // that the browser sends without an OPTIONS preflight.
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      // text/plain and multipart/form-data keep this a "simple" CORS request that the
+      // browser sends without an OPTIONS preflight. For a form it sets the type itself.
+      headers: assets.length ? undefined : { 'Content-Type': 'text/plain; charset=utf-8' },
       body,
       signal
     });
@@ -158,9 +175,9 @@ export async function compile(source: string, options: CompileOptions): Promise<
   const text = () => new TextDecoder().decode(bytes);
   if (!res.ok) {
     const reasons: Record<number, string> = {
-      400: 'empty or unreadable request body',
+      400: 'empty or unreadable request body, or an invalid asset name',
       405: 'method not allowed, the server expects POST',
-      413: 'document larger than the server accepts'
+      413: 'document and assets larger than the server accepts'
     };
     const message = `HTTP ${res.status}: ${reasons[res.status] ?? res.statusText}`;
     return fail(message, { status: res.status, log: text() || message });

@@ -1,6 +1,6 @@
 {
   "tex_compiler_url": "/api/tex",
-  "tex_support_assets": false,
+  "tex_support_assets": true,
   "tex_data_mode": "multipart",
   "auto_compile": true,
   "debounce_ms": 1500,

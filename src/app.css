@@ -95,6 +95,9 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
 }
 .dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+.image-dialog { width: auto; max-width: calc(100vw - 32px); }
+.image-dialog h2 small { margin-left: 6px; color: var(--muted); font-size: 13px; font-weight: 400; }
+.image-dialog img { display: block; max-width: min(1200px, calc(100vw - 72px)); max-height: calc(100dvh - 200px); margin: 0 auto; object-fit: contain; }
 .dialog form { display: flex; flex-direction: column; gap: 20px; padding: 20px; }
 .dialog h2 { margin: 0; font-size: 18px; font-weight: 600; }
 .dialog label small { color: var(--muted); font-weight: 400; }
@@ -196,6 +199,7 @@ h1 { margin: 8px 0 16px; font-size: 22px; font-weight: 600; text-wrap: balance; 
 .assets .empty:hover { background: none; }
 .asset { flex: 1; min-width: 0; padding: 4px 8px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .asset small { margin-left: 4px; color: var(--muted); font-size: 11px; }
+.asset .thumb { width: 24px; height: 24px; margin-right: 6px; vertical-align: middle; object-fit: cover; border-radius: 3px; background: var(--bg-hover); }
 .remove { width: 22px; height: 22px; margin-right: 2px; font-size: 11px; opacity: 0; }
 .assets li:hover .remove, .remove:focus-visible { opacity: 1; }
 /* Touch: no hover, always show buttons */

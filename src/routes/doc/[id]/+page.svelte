@@ -8,7 +8,7 @@
   import { compile, type CompileResult } from '$lib/texserver';
   import Workspace from '$lib/Workspace.svelte';
   import Preview from '$lib/Preview.svelte';
-  import { removeDocAssets, sizeLabel } from '$lib/assets.svelte';
+  import { getBlob, removeDocAssets, sizeLabel } from '$lib/assets.svelte';
   import { download as save, fileName } from '$lib/download';
 
   const d = $derived(data.docs.find((x) => x.id === page.params.id));
@@ -28,7 +28,16 @@
     const c = (controller = new AbortController());
     running = true;
     liveLog = '';
+    const assets: { name: string; data: Blob }[] = [];
+    if (config.server.supportsAssets)
+      for (const a of d.assets ?? []) {
+        const data = await getBlob(a.id);
+        if (data) assets.push({ name: a.name, data });
+        else liveLog += `Asset "${a.name}" is not available in this browser and was not sent.\n`;
+      }
+    if (c !== controller) return; // superseded while reading the assets
     const r = await compile(d.source, {
+      assets,
       url: config.server.url,
       dataMode: config.server.dataMode,
       timeoutMs: config.timeoutMs,

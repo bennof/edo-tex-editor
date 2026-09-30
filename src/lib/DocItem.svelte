@@ -1,13 +1,31 @@
 <script lang="ts">
   import { docTitle, type Doc } from '$lib/store.svelte';
-  import { addAssets, removeAsset, downloadAsset, sizeLabel } from '$lib/assets.svelte';
+  import { addAssets, removeAsset, downloadAsset, isImage, sizeLabel } from '$lib/assets.svelte';
+  import type { Asset } from '$lib/store.svelte';
+  import ImageDialog from '$lib/ImageDialog.svelte';
   import { exportDoc } from '$lib/bundle';
+  import AssetThumb from '$lib/AssetThumb.svelte';
 
   // Document in the sidebar: expandable with its assets. Files are added by
   // dropping them on the entry or the asset list, or with the + button.
   let { doc, active = false, open = $bindable(false) }: { doc: Doc; active?: boolean; open?: boolean } = $props();
 
   let over = $state(false);
+  let preview = $state<Asset | null>(null);
+  let clickTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Click downloads; on images a double click opens the large view instead, so
+  // their download waits until no second click follows.
+  function clickAsset(a: Asset) {
+    clearTimeout(clickTimer);
+    if (!isImage(a)) return downloadAsset(a);
+    clickTimer = setTimeout(() => downloadAsset(a), 250);
+  }
+
+  function dblclickAsset(a: Asset) {
+    clearTimeout(clickTimer);
+    if (isImage(a)) preview = a;
+  }
   let input: HTMLInputElement;
   const assets = $derived([...(doc.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)));
 
@@ -61,8 +79,13 @@
     <ul class="assets">
       {#each assets as a (a.id)}
         <li>
-          <button class="asset" title="Download {a.name}" onclick={() => downloadAsset(a)}>
-            {a.name} <small>{sizeLabel(a.size)}</small>
+          <button
+            class="asset"
+            title={isImage(a) ? `Download ${a.name}, double-click to view` : `Download ${a.name}`}
+            onclick={() => clickAsset(a)}
+            ondblclick={() => dblclickAsset(a)}
+          >
+            <AssetThumb asset={a} />{a.name} <small>{sizeLabel(a.size)}</small>
           </button>
           <button class="remove" aria-label="Remove {a.name}" title="Remove" onclick={() => removeAsset(doc, a)}>✕</button>
         </li>
@@ -73,4 +96,5 @@
   {/if}
 
   <input bind:this={input} type="file" multiple hidden onchange={picked} />
+  <ImageDialog bind:asset={preview} />
 </div>

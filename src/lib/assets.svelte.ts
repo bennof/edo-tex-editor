@@ -84,6 +84,11 @@ export function downloadAsset(a: Asset) {
   });
 }
 
+/** Whether the asset can be shown as an image in the browser. */
+export function isImage(a: Asset): boolean {
+  return a.type.startsWith('image/') || /\.(png|jpe?g|gif|svg|webp)$/i.test(a.name);
+}
+
 export function sizeLabel(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 ** 2) return `${Math.round(n / 1024)} KB`;
