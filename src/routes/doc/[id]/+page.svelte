@@ -31,9 +31,18 @@
     const assets: { name: string; data: Blob }[] = [];
     if (config.server.supportsAssets)
       for (const a of d.assets ?? []) {
-        const data = await getBlob(a.id);
-        if (data) assets.push({ name: a.name, data });
-        else liveLog += `Asset "${a.name}" is not available in this browser and was not sent.\n`;
+        const blob = await getBlob(a.id);
+        if (!blob) {
+          liveLog += `Asset "${a.name}" is not available in this browser and was not sent.\n`;
+          continue;
+        }
+        try {
+          // Safari can fail to stream Blobs from IndexedDB into an upload and cuts
+          // the request off; a copy in memory avoids that.
+          assets.push({ name: a.name, data: new Blob([await blob.arrayBuffer()], { type: blob.type }) });
+        } catch (e) {
+          liveLog += `Asset "${a.name}" could not be read (${(e as Error).message}) and was not sent.\n`;
+        }
       }
     if (c !== controller) return; // superseded while reading the assets
     const r = await compile(d.source, {
