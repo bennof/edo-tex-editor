@@ -1,5 +1,5 @@
 {
-  "tex_compiler_url": "localhost:8080/api/tex",
+  "tex_compiler_url": "/api/tex",
   "tex_support_assets": false,
   "tex_data_mode": "multipart",
   "auto_compile": true,
