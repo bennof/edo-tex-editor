@@ -82,6 +82,8 @@ export interface CompileOptions {
   signal?: AbortSignal;
   /** Give up after this many milliseconds; default 60000, 0 = wait forever. */
   timeoutMs?: number;
+  /** Called with each compiler log line as soon as it arrives, before the result. */
+  onLog?: (line: string) => void;
 }
 
 /**
@@ -123,6 +125,7 @@ export async function compile(source: string, options: CompileOptions): Promise<
 
   let res: Response | undefined;
   let bytes: Uint8Array<ArrayBuffer>;
+  const live = options.onLog ? new LiveLog(options.onLog) : undefined;
   try {
     res = await fetch(url, {
       method: 'POST',
@@ -132,9 +135,17 @@ export async function compile(source: string, options: CompileOptions): Promise<
       body,
       signal
     });
-    // The server streams its parts, but the log only arrives at the end of the
-    // TeX run anyway, so reading the whole response keeps this simple.
-    bytes = new Uint8Array(await res.arrayBuffer());
+    // Read the stream as it arrives, so log lines reach onLog during the TeX run
+    const buffer = new ByteBuffer();
+    const boundary = /boundary="?([^";]+)"?/i.exec(res.headers.get('Content-Type') ?? '')?.[1];
+    const reader = res.body?.getReader();
+    if (!reader) buffer.push(new Uint8Array(await res.arrayBuffer()));
+    else
+      for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) {
+        buffer.push(chunk.value);
+        if (res.ok && boundary) live?.scan(buffer.bytes(), boundary);
+      }
+    bytes = buffer.bytes();
   } catch (e) {
     const status = res?.status ?? 0;
     if (options.signal?.aborted) return fail('Aborted.', { status, aborted: true });
@@ -251,14 +262,71 @@ function ndjsonMessages(body: Uint8Array): string[] {
     .decode(body)
     .split('\n')
     .filter((l) => l.trim())
-    .map((l) => {
-      try {
-        const record = JSON.parse(l);
-        return typeof record.message === 'string' ? record.message : l;
-      } catch {
-        return l; // keep lines that are not JSON rather than losing them
+    .map(ndjsonMessage);
+}
+
+function ndjsonMessage(line: string): string {
+  try {
+    const record = JSON.parse(line);
+    return typeof record.message === 'string' ? record.message : line;
+  } catch {
+    return line; // keep lines that are not JSON rather than losing them
+  }
+}
+
+/**
+ * Passes the lines of the NDJSON part to a callback while the response is still
+ * arriving. Only complete lines are passed; the part ends at the next delimiter.
+ */
+class LiveLog {
+  private start = -1; // offset of the NDJSON body, once its headers arrived
+  private next = 0; // offset of the first line not yet passed on
+  private done = false;
+  private readonly onLog: (line: string) => void;
+
+  constructor(onLog: (line: string) => void) {
+    this.onLog = onLog;
+  }
+
+  scan(bytes: Uint8Array, boundary: string) {
+    if (this.done) return;
+    const enc = new TextEncoder();
+    if (this.start < 0) {
+      const type = indexOf(bytes, enc.encode('application/x-ndjson'), 0);
+      const blank = type < 0 ? -1 : indexOf(bytes, enc.encode('\r\n\r\n'), type);
+      if (blank < 0) return;
+      this.start = this.next = blank + 4;
+    }
+    for (let end = bytes.indexOf(0x0a, this.next); end >= 0; end = bytes.indexOf(0x0a, this.next)) {
+      const line = new TextDecoder().decode(bytes.subarray(this.next, end)).trim();
+      this.next = end + 1;
+      if (line.startsWith(`--${boundary}`)) {
+        this.done = true;
+        return;
       }
-    });
+      if (line) this.onLog(ndjsonMessage(line));
+    }
+  }
+}
+
+/** Growing byte buffer; doubling the capacity keeps appending large PDFs cheap. */
+class ByteBuffer {
+  private data = new Uint8Array(1 << 16);
+  private length = 0;
+
+  push(chunk: Uint8Array) {
+    if (this.length + chunk.length > this.data.length) {
+      const grown = new Uint8Array(Math.max(this.data.length * 2, this.length + chunk.length));
+      grown.set(this.data.subarray(0, this.length));
+      this.data = grown;
+    }
+    this.data.set(chunk, this.length);
+    this.length += chunk.length;
+  }
+
+  bytes(): Uint8Array<ArrayBuffer> {
+    return this.data.subarray(0, this.length);
+  }
 }
 
 /** Position of `needle` in `haystack` from `from` on, or -1. */

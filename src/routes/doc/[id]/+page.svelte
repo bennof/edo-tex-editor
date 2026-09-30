@@ -17,6 +17,7 @@
   let result = $state<CompileResult | null>(null); // last finished compilation
   let pdf = $state<Blob | null>(null); // last successful PDF, kept while there are errors
   let running = $state(false);
+  let liveLog = $state(''); // log lines of the running compilation
   let tab = $state<'pdf' | 'log'>('pdf');
   let controller: AbortController | null = null;
 
@@ -26,11 +27,15 @@
     controller?.abort();
     const c = (controller = new AbortController());
     running = true;
+    liveLog = '';
     const r = await compile(d.source, {
       url: config.server.url,
       dataMode: config.server.dataMode,
       timeoutMs: config.timeoutMs,
-      signal: c.signal
+      signal: c.signal,
+      onLog: (line) => {
+        if (c === controller) liveLog += line + '\n';
+      }
     });
     if (c !== controller) return; // superseded by a newer compilation or another document
     controller = null;
@@ -153,7 +158,10 @@
         </div>
         {#if tab === 'log'}
           <div class="tab-panel log">
-            {#if result}
+            {#if running}
+              <p class="empty">Compiling…</p>
+              <pre>{liveLog}</pre>
+            {:else if result}
               <dl>
                 <dt>Server</dt><dd>{config.server.url}</dd>
                 <dt>HTTP status</dt><dd>{result.status || 'no response'}</dd>

@@ -5,11 +5,45 @@
 \begin{document}
 \begin{tikzpicture}
   \begin{axis}[
-    hide axis,          % Removes axis lines, ticks, and labels
-    xmin=-5, xmax=5,    % Set your X domain bounds
-    ymin=-2, ymax=25    % Set your Y range bounds
+    axis lines=middle,
+    xlabel={$x$},
+    ylabel={$f(x)$},
+    xmin=-5, xmax=6,
+    ymin=-6, ymax=14,
+    xtick={-4,-3,...,5},
+    ytick={-4,-2,...,12},
+    grid=both,
+    minor tick num=1,
+    width=11cm,
+    height=7cm,
+    domain=-4:5,
+    samples=150,
+    enlargelimits=false,
+    xlabel style={at={(axis description cs:1,0.46)},anchor=west},
+    ylabel style={at={(axis description cs:0.47,1)},anchor=south},
   ]
-    \addplot[blue, thick, domain=-4:5, samples=100] {x^2};
+
+    % Quadratic function
+    \addplot[
+      blue,
+      very thick
+    ] {(x-1)^2-4};
+
+    % Vertex
+    \addplot[
+      only marks,
+      mark=*,
+      mark size=2pt
+    ] coordinates {(1,-4)};
+
+    \node[
+      anchor=north west
+    ] at (axis cs:1,-4) {Vertex $(1,-4)$};
+
+    \node[
+      anchor=south east
+    ] at (axis cs:4,5) {$f(x)=(x-1)^2-4$};
+
   \end{axis}
 \end{tikzpicture}
 \end{document}
