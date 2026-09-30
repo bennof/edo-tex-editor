@@ -12,19 +12,12 @@
 
   let over = $state(false);
   let preview = $state<Asset | null>(null);
-  let clickTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // Click downloads; on images a double click opens the large view instead, so
-  // their download waits until no second click follows.
+  // A click opens images in the large view (with a download button there) and
+  // downloads other files.
   function clickAsset(a: Asset) {
-    clearTimeout(clickTimer);
-    if (!isImage(a)) return downloadAsset(a);
-    clickTimer = setTimeout(() => downloadAsset(a), 250);
-  }
-
-  function dblclickAsset(a: Asset) {
-    clearTimeout(clickTimer);
     if (isImage(a)) preview = a;
+    else downloadAsset(a);
   }
   let input: HTMLInputElement;
   const assets = $derived([...(doc.assets ?? [])].sort((a, b) => a.name.localeCompare(b.name)));
@@ -81,9 +74,8 @@
         <li>
           <button
             class="asset"
-            title={isImage(a) ? `Download ${a.name}, double-click to view` : `Download ${a.name}`}
+            title={isImage(a) ? `View ${a.name}` : `Download ${a.name}`}
             onclick={() => clickAsset(a)}
-            ondblclick={() => dblclickAsset(a)}
           >
             <AssetThumb asset={a} />{a.name} <small>{sizeLabel(a.size)}</small>
           </button>
